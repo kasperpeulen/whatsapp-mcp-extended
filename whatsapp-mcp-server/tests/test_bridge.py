@@ -4,14 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from lib.bridge import (
-    BridgeError,
-    delete_message,
-    edit_message,
-    get_group_info,
-    send_message,
-    send_reaction,
-)
+import lib.bridge as bridge_module
+from lib.bridge import BridgeError, delete_message, edit_message, get_group_info, send_message, send_reaction
 
 
 class TestSendMessage:
@@ -141,3 +135,34 @@ class TestGetGroupInfo:
 
         assert result["success"] is True
         assert result["name"] == "Test Group"
+
+
+class TestGetHeaders:
+    """Tests for API key header selection."""
+
+    def test_prefers_api_key(self, monkeypatch):
+        """API_KEY takes precedence when both variables exist."""
+        monkeypatch.setenv("API_KEY", "primary-key")
+        monkeypatch.setenv("WHATSAPP_API_KEY", "fallback-key")
+
+        headers = bridge_module._get_headers()
+
+        assert headers["X-API-Key"] == "primary-key"
+
+    def test_falls_back_to_whatsapp_api_key(self, monkeypatch):
+        """WHATSAPP_API_KEY is used when API_KEY is absent."""
+        monkeypatch.delenv("API_KEY", raising=False)
+        monkeypatch.setenv("WHATSAPP_API_KEY", "fallback-key")
+
+        headers = bridge_module._get_headers()
+
+        assert headers["X-API-Key"] == "fallback-key"
+
+    def test_omits_header_without_api_keys(self, monkeypatch):
+        """No auth header is sent when neither variable exists."""
+        monkeypatch.delenv("API_KEY", raising=False)
+        monkeypatch.delenv("WHATSAPP_API_KEY", raising=False)
+
+        headers = bridge_module._get_headers()
+
+        assert "X-API-Key" not in headers
